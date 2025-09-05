@@ -3,3 +3,4 @@ __pycache__/
 .cache/
 registry.sqlite
 synthetic.parquet
+*.egg-info/

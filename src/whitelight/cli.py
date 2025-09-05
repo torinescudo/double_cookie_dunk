@@ -12,6 +12,24 @@ from . import data, synthetic, strategy, portfolio, registry, reports
 app = typer.Typer(help="Whitelight backtesting toolkit")
 
 
+def _extract_close(df: pd.DataFrame, name: str) -> pd.Series:
+    """Return the ``close`` column as a Series indexed by date.
+
+    Depending on caching or upstream changes, ``data.download_price_data`` may
+    yield DataFrames with a ``Ticker`` level in the index or with an extra
+    column dimension. This helper normalises the structure so callers receive a
+    plain ``Series`` indexed only by date and named according to ``name``.
+    """
+
+    series = df["close"]
+    if isinstance(series, pd.DataFrame):
+        # Drop any redundant column level
+        series = series.iloc[:, 0]
+    if isinstance(series.index, pd.MultiIndex) and "Ticker" in series.index.names:
+        series = series.droplevel("Ticker")
+    return series.rename(name)
+
+
 @app.command()
 def download(start: str = "1999-01-01", end: Optional[str] = None) -> None:
     """Download core datasets and cache them locally."""
@@ -42,9 +60,9 @@ def backtest(config: Optional[Path] = None) -> None:
     sqqq = data.download_price_data("SQQQ")
     df = pd.concat(
         [
-            ndx["close"].rename("ndx"),
-            tqqq["close"].rename("tqqq"),
-            sqqq["close"].rename("sqqq"),
+            _extract_close(ndx, "ndx"),
+            _extract_close(tqqq, "tqqq"),
+            _extract_close(sqqq, "sqqq"),
         ],
         axis=1,
         join="inner",
@@ -63,9 +81,9 @@ def montecarlo(n: int = 100) -> None:
     sqqq = data.download_price_data("SQQQ")
     df = pd.concat(
         [
-            ndx["close"].rename("ndx"),
-            tqqq["close"].rename("tqqq"),
-            sqqq["close"].rename("sqqq"),
+            _extract_close(ndx, "ndx"),
+            _extract_close(tqqq, "tqqq"),
+            _extract_close(sqqq, "sqqq"),
         ],
         axis=1,
         join="inner",
@@ -73,8 +91,14 @@ def montecarlo(n: int = 100) -> None:
     reg = registry.Registry()
     from . import montecarlo as mc
 
-    mc.run_montecarlo(df, n, reg)
+    best = mc.run_montecarlo(df, n, reg)
     typer.echo("Monte Carlo completed")
+    eq_best = strategy.backtest(df, best.params)
+    reports.plot_equity(eq_best, "best_equity.png")
+    typer.echo(
+        f"Best model {best.model_id} Sharpe {best.metrics.get('sharpe', 0):.2f}"
+        " saved to best_equity.png"
+    )
 
 
 @app.command()
@@ -93,3 +117,7 @@ def top(metric: str = "sharpe", k: int = 20) -> None:
     reg = registry.Registry()
     df = reg.top(metric, k)
     typer.echo(df.to_string(index=False))
+
+
+if __name__ == "__main__":
+    app()

@@ -37,9 +37,17 @@ def _evaluate(df, seed: int) -> Result:
     return Result(str(seed), params, m.__dict__)
 
 
-def run_montecarlo(df, n: int, registry: Registry) -> None:
-    def worker(seed: int):
+def run_montecarlo(df, n: int, registry: Registry) -> Result:
+    """Evaluate ``n`` random models and persist results.
+
+    Returns the :class:`Result` with the highest Sharpe ratio so callers can
+    perform additional reporting (e.g. plot its equity curve).
+    """
+
+    def worker(seed: int) -> Result:
         res = _evaluate(df, seed)
         registry.insert(res.model_id, res.params, res.metrics)
+        return res
 
-    Parallel(n_jobs=-1)(delayed(worker)(s) for s in range(n))
+    results = Parallel(n_jobs=-1)(delayed(worker)(s) for s in range(n))
+    return max(results, key=lambda r: r.metrics.get("sharpe", float("-inf")))
