@@ -56,7 +56,11 @@ def download_price_data(
         df = raw[["Close"]].rename(columns={"Close": "close"})
         cal = mcal.get_calendar("XNYS")
         sched = cal.schedule(start_date=start, end_date=end)
-        all_days = mcal.date_range(sched, frequency="1D")
+        # ``mcal.date_range`` returns timezone-aware timestamps while
+        # ``yfinance`` provides a timezone-naive index. Reindexing with mismatched
+        # timezone information raises a ``TypeError``. Drop the timezone
+        # component so both indexes align on naive datetimes.
+        all_days = mcal.date_range(sched, frequency="1D").tz_localize(None)
         df = df.reindex(all_days, method="ffill")
         CACHE[key] = df
     if len(df) < 252 * 20:
