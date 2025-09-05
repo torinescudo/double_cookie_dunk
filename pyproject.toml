@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whitelight"
+version = "0.1.0"
+description = "EOD backtester and Monte Carlo search for TQQQ/SQQQ strategies"
+authors = [{name="Quant"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "numpy",
+    "scipy",
+    "statsmodels",
+    "matplotlib",
+    "pydantic",
+    "tqdm",
+    "joblib",
+    "numba",
+    "yfinance",
+    "pandas_market_calendars",
+    "tenacity",
+    "diskcache",
+    "typer",
+]
+
+[project.scripts]
+whitelight = "whitelight.cli:app"
